@@ -1,8 +1,11 @@
 import { GoogleGenAI, Modality, Type, ThinkingLevel } from "@google/genai";
 
 // Use process.env.API_KEY if available (for user-selected keys), otherwise fallback to the default GEMINI_API_KEY
-const getAI = () => {
-  const key = process.env.API_KEY || process.env.GEMINI_API_KEY;
+const getAI = (userKey?: string) => {
+  const key = userKey || process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!key) {
+    throw new Error("No API key provided. Please set a Gemini API key in settings.");
+  }
   return new GoogleGenAI({ apiKey: key });
 };
 
@@ -10,18 +13,70 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Pr
   try {
     return await fn();
   } catch (error: any) {
+    console.error("Gemini API Error:", error);
+    
+    // Check for specific error types
+    const status = error.status || (error.response && error.response.status);
+    const message = error.message || "";
+
     // Retry on rate limit (429) or server errors (5xx)
-    if (retries > 0 && (error.status === 429 || error.status >= 500)) {
+    if (retries > 0 && (status === 429 || status >= 500)) {
       await new Promise(resolve => setTimeout(resolve, delay));
       return withRetry(fn, retries - 1, delay * 2);
     }
-    throw error;
+
+    // Provide clearer feedback for common errors
+    if (status === 403 || message.includes("permission denied")) {
+      throw new Error("API Key issue: Permission Denied. Please ensure you have a valid Gemini API key with proper billing/project access.");
+    }
+    if (status === 429) {
+      throw new Error("Rate limit exceeded. Please wait a moment before trying again.");
+    }
+    if (message.includes("safety")) {
+      throw new Error("The request was blocked by safety filters. Please try a different prompt.");
+    }
+
+    throw new Error(message || "An unexpected error occurred with the Gemini API. Please try again.");
   }
 }
 
-export async function analyzeResume(resumeContent: string | { data: string; mimeType: string }) {
+export async function generateProfileAssets(resumeText: string, jobDescription: string, userKey?: string) {
   return withRetry(async () => {
-    const ai = getAI();
+    const ai = getAI(userKey);
+    const model = "gemini-3.1-pro-preview";
+    const prompt = `
+      Based on the following resume and job description, generate professional profile assets:
+      1. A LinkedIn Summary (About section) that is engaging and keyword-optimized.
+      2. Three "Cover Letter Snippets" - short, impactful paragraphs that can be used in emails or as part of a longer letter, each focusing on a different strength (e.g., Technical Skills, Leadership, Problem Solving).
+      
+      Output in Markdown format with clear headings.
+
+      RESUME:
+      ${resumeText}
+
+      JOB DESCRIPTION:
+      ${jobDescription}
+    `;
+
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+      });
+      return response.text;
+    } catch (err) {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+      });
+      return response.text;
+    }
+  });
+}
+
+export async function analyzeResume(resumeContent: string | { data: string; mimeType: string }, userKey?: string) {
+  return withRetry(async () => {
+    const ai = getAI(userKey);
     const model = "gemini-3.1-pro-preview";
     const prompt = "Analyze this resume. First, perform OCR or extract the full text content accurately. Then, provide a brief summary of key skills and experience. Output the FULL TEXT of the resume first, followed by the summary, separated by '---SUMMARY---'.";
     
@@ -50,9 +105,9 @@ export async function analyzeResume(resumeContent: string | { data: string; mime
   });
 }
 
-export async function tailorResume(resumeText: string, jobDescription: string) {
+export async function tailorResume(resumeText: string, jobDescription: string, userKey?: string) {
   return withRetry(async () => {
-    const ai = getAI();
+    const ai = getAI(userKey);
     const model = "gemini-3.1-pro-preview";
     const prompt = `
       You are an expert career coach. Tailor the following resume to match the job description.
@@ -83,9 +138,9 @@ export async function tailorResume(resumeText: string, jobDescription: string) {
   });
 }
 
-export async function researchCompany(companyName: string) {
+export async function researchCompany(companyName: string, userKey?: string) {
   return withRetry(async () => {
-    const ai = getAI();
+    const ai = getAI(userKey);
     const model = "gemini-3-flash-preview";
     const prompt = `Research the company "${companyName}". Provide a brief overview of their mission, recent news, and culture to help tailor a resume.`;
 
@@ -104,9 +159,9 @@ export async function researchCompany(companyName: string) {
   });
 }
 
-export async function getQuickFeedback(text: string) {
+export async function getQuickFeedback(text: string, userKey?: string) {
   return withRetry(async () => {
-    const ai = getAI();
+    const ai = getAI(userKey);
     const model = "gemini-2.5-flash-lite-latest";
     const prompt = `Provide a very brief, 2-sentence critique of this text for professional impact: "${text}"`;
 
@@ -119,9 +174,9 @@ export async function getQuickFeedback(text: string) {
   });
 }
 
-export async function generateProfileImage(prompt: string, size: "1K" | "2K" | "4K" = "1K", aspectRatio: string = "1:1") {
+export async function generateProfileImage(prompt: string, size: "1K" | "2K" | "4K" = "1K", aspectRatio: string = "1:1", userKey?: string) {
   return withRetry(async () => {
-    const ai = getAI();
+    const ai = getAI(userKey);
     const model = "gemini-3-pro-image-preview";
     const response = await ai.models.generateContent({
       model,
@@ -145,9 +200,9 @@ export async function generateProfileImage(prompt: string, size: "1K" | "2K" | "
   });
 }
 
-export async function analyzeSkillsGap(resumeText: string, jobDescription: string) {
+export async function analyzeSkillsGap(resumeText: string, jobDescription: string, userKey?: string) {
   return withRetry(async () => {
-    const ai = getAI();
+    const ai = getAI(userKey);
     const model = "gemini-3.1-pro-preview";
     const prompt = `
       Analyze the following resume and job description. 
@@ -179,9 +234,9 @@ export async function analyzeSkillsGap(resumeText: string, jobDescription: strin
   });
 }
 
-export async function analyzeImage(base64Image: string, mimeType: string, prompt: string = "Describe this image in detail and extract any text or insights.") {
+export async function analyzeImage(base64Image: string, mimeType: string, prompt: string = "Describe this image in detail and extract any text or insights.", userKey?: string) {
   return withRetry(async () => {
-    const ai = getAI();
+    const ai = getAI(userKey);
     const model = "gemini-3.1-pro-preview";
     const response = await ai.models.generateContent({
       model,
@@ -202,9 +257,9 @@ export async function analyzeImage(base64Image: string, mimeType: string, prompt
   });
 }
 
-export async function editProfileImage(base64Image: string, mimeType: string, editPrompt: string) {
+export async function editProfileImage(base64Image: string, mimeType: string, editPrompt: string, userKey?: string) {
   return withRetry(async () => {
-    const ai = getAI();
+    const ai = getAI(userKey);
     const model = "gemini-2.5-flash-image";
     const response = await ai.models.generateContent({
       model,
@@ -230,9 +285,9 @@ export async function editProfileImage(base64Image: string, mimeType: string, ed
   });
 }
 
-export async function generateCoverLetter(resumeText: string, jobDescription: string) {
+export async function generateCoverLetter(resumeText: string, jobDescription: string, userKey?: string) {
   return withRetry(async () => {
-    const ai = getAI();
+    const ai = getAI(userKey);
     const model = "gemini-3.1-pro-preview";
     const prompt = `
       You are an expert career coach. Write a compelling, professional cover letter based on the following resume and job description.
@@ -263,9 +318,9 @@ export async function generateCoverLetter(resumeText: string, jobDescription: st
   });
 }
 
-export async function optimizeForATS(tailoredResume: string, jobDescription: string) {
+export async function optimizeForATS(tailoredResume: string, jobDescription: string, userKey?: string) {
   return withRetry(async () => {
-    const ai = getAI();
+    const ai = getAI(userKey);
     const model = "gemini-3.1-pro-preview";
     const prompt = `
       Review the following tailored resume and the original job description.

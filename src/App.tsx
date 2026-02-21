@@ -17,7 +17,13 @@ import {
   ChevronRight,
   Camera,
   Wand2,
-  Key
+  Key,
+  Settings,
+  X,
+  Layout,
+  Briefcase,
+  User,
+  Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
@@ -33,7 +39,8 @@ import {
   analyzeImage,
   analyzeSkillsGap,
   optimizeForATS,
-  generateCoverLetter
+  generateCoverLetter,
+  generateProfileAssets
 } from './services/gemini';
 
 declare global {
@@ -67,8 +74,34 @@ export default function App() {
   const [imageAnalysisResult, setImageAnalysisResult] = useState('');
   const [skillsGap, setSkillsGap] = useState('');
   const [coverLetter, setCoverLetter] = useState('');
+  const [profileAssets, setProfileAssets] = useState('');
+  const [companyNameInput, setCompanyNameInput] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('modern');
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'tailor' | 'research' | 'creative'>('tailor');
+  const [showSettings, setShowSettings] = useState(false);
+  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
+
+  const clearAllData = () => {
+    if (confirm('Are you sure you want to clear all resume data and results?')) {
+      setResumeText('');
+      setJobDescription('');
+      setResumeFile(null);
+      setAnalysis('');
+      setTailoredResume('');
+      setCompanyResearch(null);
+      setQuickFeedback('');
+      setSkillsGap('');
+      setCoverLetter('');
+      setProfileAssets('');
+      setGeneratedImage('');
+      setError(null);
+    }
+  };
+
+  useEffect(() => {
+    localStorage.setItem('gemini_api_key', userApiKey);
+  }, [userApiKey]);
   
   // Loading states
   const [loading, setLoading] = useState({
@@ -81,7 +114,8 @@ export default function App() {
     imageAnalysis: false,
     skillsGap: false,
     ats: false,
-    coverLetter: false
+    coverLetter: false,
+    profileAssets: false
   });
 
   const resumeRef = useRef<HTMLDivElement>(null);
@@ -111,7 +145,7 @@ export default function App() {
     setLoading(prev => ({ ...prev, analysis: true }));
     setError(null);
     try {
-      const result = await analyzeResume(resumeFile || resumeText);
+      const result = await analyzeResume(resumeFile || resumeText, userApiKey);
       if (result && result.includes('---SUMMARY---')) {
         const [text, summary] = result.split('---SUMMARY---');
         setResumeText(text.trim());
@@ -132,12 +166,12 @@ export default function App() {
     setLoading(prev => ({ ...prev, tailor: true }));
     setError(null);
     try {
-      const result = await tailorResume(resumeText || "See uploaded file", jobDescription);
+      const result = await tailorResume(resumeText || "See uploaded file", jobDescription, userApiKey);
       setTailoredResume(result || '');
       // Automatically analyze skills gap after tailoring
       onAnalyzeSkillsGap();
     } catch (err: any) {
-      setError("Failed to tailor resume. The AI might be busy, please try again.");
+      setError(err.message || "Failed to tailor resume. The AI might be busy, please try again.");
       console.error(err);
     } finally {
       setLoading(prev => ({ ...prev, tailor: false }));
@@ -148,7 +182,7 @@ export default function App() {
     if (!resumeText && !resumeFile) return;
     setLoading(prev => ({ ...prev, skillsGap: true }));
     try {
-      const result = await analyzeSkillsGap(resumeText || "See uploaded file", jobDescription);
+      const result = await analyzeSkillsGap(resumeText || "See uploaded file", jobDescription, userApiKey);
       setSkillsGap(result || '');
     } catch (error) {
       console.error(error);
@@ -161,7 +195,7 @@ export default function App() {
     if (!tailoredResume || !jobDescription) return;
     setLoading(prev => ({ ...prev, ats: true }));
     try {
-      const result = await optimizeForATS(tailoredResume, jobDescription);
+      const result = await optimizeForATS(tailoredResume, jobDescription, userApiKey);
       setTailoredResume(result || '');
     } catch (error) {
       console.error(error);
@@ -175,13 +209,28 @@ export default function App() {
     setLoading(prev => ({ ...prev, coverLetter: true }));
     setError(null);
     try {
-      const result = await generateCoverLetter(resumeText || "See uploaded file", jobDescription);
+      const result = await generateCoverLetter(resumeText || "See uploaded file", jobDescription, userApiKey);
       setCoverLetter(result || '');
     } catch (err: any) {
-      setError("Failed to generate cover letter. Please try again.");
+      setError(err.message || "Failed to generate cover letter. Please try again.");
       console.error(err);
     } finally {
       setLoading(prev => ({ ...prev, coverLetter: false }));
+    }
+  };
+
+  const onGenerateProfileAssets = async () => {
+    if (!resumeText && !resumeFile) return;
+    setLoading(prev => ({ ...prev, profileAssets: true }));
+    setError(null);
+    try {
+      const result = await generateProfileAssets(resumeText || "See uploaded file", jobDescription, userApiKey);
+      setProfileAssets(result || '');
+    } catch (err: any) {
+      setError(err.message || "Failed to generate profile assets. Please try again.");
+      console.error(err);
+    } finally {
+      setLoading(prev => ({ ...prev, profileAssets: false }));
     }
   };
 
@@ -190,13 +239,21 @@ export default function App() {
     const companyMatch = jobDescription.match(/at\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
     const companyName = companyMatch ? companyMatch[1] : prompt("Enter company name to research:");
     if (!companyName) return;
+    onResearchManual(companyName);
+  };
+
+  const onResearchManual = async (name?: string) => {
+    const companyName = name || companyNameInput;
+    if (!companyName) return;
 
     setLoading(prev => ({ ...prev, research: true }));
+    setError(null);
     try {
-      const result = await researchCompany(companyName);
+      const result = await researchCompany(companyName, userApiKey);
       setCompanyResearch(result);
-    } catch (error) {
-      console.error(error);
+    } catch (err: any) {
+      setError(err.message || "Failed to research company. Please try again.");
+      console.error(err);
     } finally {
       setLoading(prev => ({ ...prev, research: false }));
     }
@@ -205,7 +262,7 @@ export default function App() {
   const onGetFeedback = async (text: string) => {
     setLoading(prev => ({ ...prev, feedback: true }));
     try {
-      const result = await getQuickFeedback(text);
+      const result = await getQuickFeedback(text, userApiKey);
       setQuickFeedback(result || '');
     } catch (error) {
       console.error(error);
@@ -216,7 +273,7 @@ export default function App() {
 
   const onGenerateImage = async () => {
     // Check for API key selection for gemini-3-pro-image-preview
-    if (typeof window !== 'undefined' && window.aistudio) {
+    if (!userApiKey && typeof window !== 'undefined' && window.aistudio) {
       try {
         const hasKey = await window.aistudio.hasSelectedApiKey();
         if (!hasKey) {
@@ -231,7 +288,7 @@ export default function App() {
     setLoading(prev => ({ ...prev, image: true }));
     setError(null);
     try {
-      const result = await generateProfileImage(profilePrompt, imageSize, aspectRatio);
+      const result = await generateProfileImage(profilePrompt, imageSize, aspectRatio, userApiKey);
       setGeneratedImage(result);
     } catch (err: any) {
       const errorMsg = err.message || "";
@@ -239,7 +296,7 @@ export default function App() {
         setError("API Key issue: Permission Denied. Please select a valid paid project API key.");
         if (window.aistudio) await window.aistudio.openSelectKey();
       } else {
-        setError("Failed to generate headshot. Please try again.");
+        setError(err.message || "Failed to generate headshot. Please try again.");
       }
       console.error(err);
     } finally {
@@ -251,7 +308,7 @@ export default function App() {
     if (!generatedImage) return;
     setLoading(prev => ({ ...prev, edit: true }));
     try {
-      const result = await editProfileImage(generatedImage, "image/png", editPrompt);
+      const result = await editProfileImage(generatedImage, "image/png", editPrompt, userApiKey);
       setGeneratedImage(result);
     } catch (error) {
       console.error(error);
@@ -271,7 +328,7 @@ export default function App() {
       
       setLoading(prev => ({ ...prev, imageAnalysis: true }));
       try {
-        const result = await analyzeImage(base64, file.type);
+        const result = await analyzeImage(base64, file.type, undefined, userApiKey);
         setImageAnalysisResult(result || '');
       } catch (error) {
         console.error(error);
@@ -314,12 +371,35 @@ export default function App() {
             </div>
             <span className="font-semibold text-lg tracking-tight">ResumeCraft AI</span>
           </div>
-          <nav className="hidden md:flex items-center gap-6">
-            <a href="#tailor" className="text-sm font-medium text-[#666] hover:text-[#1a1a1a]">Tailoring</a>
-            <a href="#research" className="text-sm font-medium text-[#666] hover:text-[#1a1a1a]">Research</a>
-            <a href="#creative" className="text-sm font-medium text-[#666] hover:text-[#1a1a1a]">Creative</a>
+          <nav className="hidden md:flex items-center gap-1 bg-[#f5f5f5] p-1 rounded-full">
+            {[
+              { id: 'tailor', icon: Briefcase, label: 'Tailoring' },
+              { id: 'research', icon: Globe, label: 'Research' },
+              { id: 'creative', icon: User, label: 'Creative' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  activeTab === tab.id 
+                  ? 'bg-white text-[#1a1a1a] shadow-sm' 
+                  : 'text-[#666] hover:text-[#1a1a1a]'
+                }`}
+              >
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            ))}
           </nav>
-          <a href="#tailor" className="btn-primary py-2 px-4 text-sm">Get Started</a>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowSettings(true)}
+              className="p-2 text-[#666] hover:text-[#1a1a1a] transition-colors"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+            <a href="#tailor" className="btn-primary py-2 px-4 text-sm">Get Started</a>
+          </div>
         </div>
       </header>
 
@@ -351,8 +431,18 @@ export default function App() {
           </p>
         </section>
 
-        {/* Input Section */}
-        <section id="tailor" className="grid md:grid-cols-2 gap-8">
+        {/* Main Content Tabs */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'tailor' && (
+            <motion.div
+              key="tailor"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-12"
+            >
+              {/* Input Section */}
+              <section id="tailor" className="grid md:grid-cols-2 gap-8">
           <div className="card space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -408,32 +498,38 @@ export default function App() {
               value={jobDescription}
               onChange={(e) => setJobDescription(e.target.value)}
             />
-            <div className="flex gap-3">
-              <button 
-                onClick={onResearch}
-                disabled={loading.research || !jobDescription}
-                className="btn-secondary flex-1 flex items-center justify-center gap-2"
-              >
-                {loading.research ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                Research Company
-              </button>
-              <button 
-                onClick={onTailor}
-                disabled={loading.tailor || (!resumeText && !resumeFile) || !jobDescription}
-                className="btn-primary flex-1 flex items-center justify-center gap-2"
-              >
-                {loading.tailor ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                Tailor Resume
-              </button>
+            
+            <div className="space-y-4 pt-2">
+              <div className="flex gap-3">
+                <button 
+                  onClick={onTailor}
+                  disabled={loading.tailor || (!resumeText && !resumeFile) || !jobDescription}
+                  className="btn-primary flex-1 flex items-center justify-center gap-2"
+                >
+                  {loading.tailor ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  Tailor Resume
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  onClick={onGenerateCoverLetter}
+                  disabled={loading.coverLetter || (!resumeText && !resumeFile) || !jobDescription}
+                  className="btn-secondary flex items-center justify-center gap-2 border-emerald-100 bg-emerald-50/30 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {loading.coverLetter ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                  Cover Letter
+                </button>
+                <button 
+                  onClick={onGenerateProfileAssets}
+                  disabled={loading.profileAssets || (!resumeText && !resumeFile) || !jobDescription}
+                  className="btn-secondary flex items-center justify-center gap-2 border-indigo-100 bg-indigo-50/30 text-indigo-700 hover:bg-indigo-50"
+                >
+                  {loading.profileAssets ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                  LinkedIn Assets
+                </button>
+              </div>
             </div>
-            <button 
-              onClick={onGenerateCoverLetter}
-              disabled={loading.coverLetter || (!resumeText && !resumeFile) || !jobDescription}
-              className="btn-secondary w-full flex items-center justify-center gap-2 mt-4 border-emerald-100 bg-emerald-50/30 text-emerald-700 hover:bg-emerald-50"
-            >
-              {loading.coverLetter ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-              Generate Cover Letter
-            </button>
           </div>
         </section>
 
@@ -452,53 +548,53 @@ export default function App() {
             >
               <div className="grid md:grid-cols-3 gap-8">
                 {analysis && (
-                  <div className="card md:col-span-1 space-y-4">
+                  <div className="card md:col-span-3 space-y-4">
                     <h3 className="font-semibold text-sm uppercase tracking-wider text-[#666]">Resume Insights</h3>
-                    <div className="text-sm prose prose-sm">
+                    <div className="text-sm prose prose-sm max-w-none">
                       <Markdown>{analysis}</Markdown>
                     </div>
-                  </div>
-                )}
-                {companyResearch && (
-                  <div className="card md:col-span-2 space-y-4">
-                    <h3 className="font-semibold text-sm uppercase tracking-wider text-[#666]">Company Intelligence</h3>
-                    <div className="text-sm prose prose-sm">
-                      <Markdown>{companyResearch.text}</Markdown>
-                    </div>
-                    {companyResearch.sources.length > 0 && (
-                      <div className="pt-4 border-t border-[#f0f0f0]">
-                        <p className="text-xs font-medium text-[#999] mb-2">Sources:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {companyResearch.sources.map((chunk: any, i: number) => (
-                            <a 
-                              key={i} 
-                              href={chunk.web?.uri} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-xs bg-[#f5f5f5] px-2 py-1 rounded hover:bg-[#eee] transition-colors"
-                            >
-                              {chunk.web?.title || 'Source'}
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
 
               {tailoredResume && (
                 <div className="space-y-8">
-                  <div className="grid md:grid-cols-3 gap-8">
-                    <div className="md:col-span-1 space-y-8">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-semibold">Tailored Results</h2>
+                    <div className="flex gap-2">
+                      <button onClick={exportPDF} className="btn-primary py-2 px-6 text-sm flex items-center gap-2">
+                        <Download className="w-4 h-4" /> Export PDF
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid lg:grid-cols-12 gap-8">
+                    <div className="lg:col-span-4 space-y-8">
                       {skillsGap && (
                         <div className="card space-y-4 bg-amber-50/30 border-amber-100">
                           <h3 className="font-semibold text-sm uppercase tracking-wider text-amber-800 flex items-center gap-2">
                             <AlertCircle className="w-4 h-4" /> Skills Gap Analysis
                           </h3>
-                          <div className="text-sm prose prose-sm prose-amber">
+                          <div className="text-sm prose prose-sm prose-amber max-w-none">
                             <Markdown>{skillsGap}</Markdown>
                           </div>
+                        </div>
+                      )}
+                      
+                      {coverLetter && (
+                        <div className="card space-y-4 bg-emerald-50/30 border-emerald-100">
+                          <h3 className="font-semibold text-sm uppercase tracking-wider text-emerald-800 flex items-center gap-2">
+                            <FileText className="w-4 h-4" /> Cover Letter Preview
+                          </h3>
+                          <div className="text-sm prose prose-sm prose-emerald max-w-none line-clamp-[15]">
+                            <Markdown>{coverLetter}</Markdown>
+                          </div>
+                          <button 
+                            onClick={() => setActiveTab('tailor')} // Stay on tab but scroll or just show it's there
+                            className="text-xs font-medium text-emerald-700 hover:underline"
+                          >
+                            Scroll to full letter below ↓
+                          </button>
                         </div>
                       )}
 
@@ -508,10 +604,13 @@ export default function App() {
                       </div>
                     </div>
                     
-                    <div className="md:col-span-2 space-y-8">
+                    <div className="lg:col-span-8 space-y-8">
                       <div className="card space-y-6">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                          <h2 className="text-xl font-semibold">Tailored Resume</h2>
+                          <div className="space-y-1">
+                            <h3 className="text-lg font-semibold">Tailored Resume</h3>
+                            <p className="text-xs text-[#666]">Optimized for the provided job description</p>
+                          </div>
                           <div className="flex flex-wrap gap-2">
                             <button 
                               onClick={onOptimizeATS}
@@ -520,9 +619,6 @@ export default function App() {
                             >
                               {loading.ats ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                               ATS Optimize
-                            </button>
-                            <button onClick={exportPDF} className="btn-secondary py-2 px-4 text-sm flex items-center gap-2">
-                              <Download className="w-4 h-4" /> PDF
                             </button>
                           </div>
                         </div>
@@ -593,6 +689,34 @@ export default function App() {
                           </div>
                         </motion.div>
                       )}
+
+                      {profileAssets && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="card space-y-6"
+                        >
+                          <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-semibold">LinkedIn & Profile Assets</h2>
+                            <button 
+                              onClick={() => {
+                                const blob = new Blob([profileAssets], { type: 'text/markdown' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'profile-assets.md';
+                                a.click();
+                              }}
+                              className="btn-secondary py-2 px-4 text-sm flex items-center gap-2"
+                            >
+                              <Download className="w-4 h-4" /> Markdown
+                            </button>
+                          </div>
+                          <div className="p-12 bg-white border border-[#e5e5e5] rounded-lg shadow-sm markdown-body">
+                            <Markdown>{profileAssets}</Markdown>
+                          </div>
+                        </motion.div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -600,9 +724,81 @@ export default function App() {
             </motion.section>
           )}
         </AnimatePresence>
+      </motion.div>
+    )}
 
-        {/* Creative Section */}
-        <section id="creative" className="space-y-8">
+          {activeTab === 'research' && (
+            <motion.div
+              key="research"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-8"
+            >
+              <div className="card space-y-6 max-w-4xl mx-auto">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <Globe className="w-5 h-5" /> Company Research
+                  </h2>
+                </div>
+                <div className="flex gap-2">
+                  <input 
+                    type="text"
+                    placeholder="Enter company name to research..."
+                    className="input-field flex-1 py-2"
+                    value={companyNameInput}
+                    onChange={(e) => setCompanyNameInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && onResearchManual()}
+                  />
+                  <button 
+                    onClick={() => onResearchManual()}
+                    disabled={loading.research || !companyNameInput}
+                    className="btn-primary py-2 px-6 flex items-center gap-2"
+                  >
+                    {loading.research ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    Research
+                  </button>
+                </div>
+
+                {companyResearch && (
+                  <div className="space-y-4 pt-4 border-t border-[#f0f0f0]">
+                    <div className="text-sm prose prose-sm max-w-none">
+                      <Markdown>{companyResearch.text}</Markdown>
+                    </div>
+                    {companyResearch.sources.length > 0 && (
+                      <div className="pt-4 border-t border-[#f0f0f0]">
+                        <p className="text-xs font-medium text-[#999] mb-2">Sources:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {companyResearch.sources.map((chunk: any, i: number) => (
+                            <a 
+                              key={i} 
+                              href={chunk.web?.uri} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-xs bg-[#f5f5f5] px-2 py-1 rounded hover:bg-[#eee] transition-colors"
+                            >
+                              {chunk.web?.title || 'Source'}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'creative' && (
+            <motion.div
+              key="creative"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-12"
+            >
+              {/* Creative Section */}
+              <section id="creative" className="space-y-8">
           <div className="card space-y-8">
             <div className="flex items-center justify-between">
               <div>
@@ -749,7 +945,74 @@ export default function App() {
             )}
           </div>
         </section>
-      </main>
+      </motion.div>
+    )}
+  </AnimatePresence>
+</main>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {showSettings && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSettings(false)}
+              className="absolute inset-0 bg-black/20 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[32px] shadow-2xl p-8 space-y-6"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold">Settings</h3>
+                <button 
+                  onClick={() => setShowSettings(false)}
+                  className="p-2 hover:bg-[#f5f5f5] rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-[#666]">Custom Gemini API Key</label>
+                  <div className="relative">
+                    <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#999]" />
+                    <input 
+                      type="password"
+                      placeholder="Paste your API key here..."
+                      className="input-field pl-11"
+                      value={userApiKey}
+                      onChange={(e) => setUserApiKey(e.target.value)}
+                    />
+                  </div>
+                  <p className="text-xs text-[#999]">
+                    Your key is stored locally in your browser. If provided, it will be used for all AI functions.
+                  </p>
+                </div>
+              </div>
+
+              <button 
+                onClick={clearAllData}
+                className="btn-secondary w-full border-red-100 text-red-600 hover:bg-red-50"
+              >
+                Clear All Application Data
+              </button>
+
+              <button 
+                onClick={() => setShowSettings(false)}
+                className="btn-primary w-full"
+              >
+                Save & Close
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Footer */}
       <footer className="mt-20 border-t border-[#e5e5e5] py-12 bg-white">
