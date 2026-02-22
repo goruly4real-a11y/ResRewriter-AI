@@ -1,8 +1,11 @@
 import { GoogleGenAI, Modality, Type, ThinkingLevel } from "@google/genai";
 
-// Use process.env.API_KEY if available (for user-selected keys), otherwise fallback to the default GEMINI_API_KEY
+// Use a safe way to access environment variables in the browser
 const getAI = (userKey?: string) => {
-  const key = userKey || process.env.API_KEY || process.env.GEMINI_API_KEY;
+  // @ts-ignore - process.env is replaced by Vite define
+  const envKey = typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : undefined;
+  const key = userKey || envKey;
+  
   if (!key) {
     throw new Error("No API key provided. Please set a Gemini API key in settings.");
   }
