@@ -1,230 +1,104 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
 @import "tailwindcss";
-@plugin "@tailwindcss/typography";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-serif: "Playfair Display", serif;
 }
 
 @layer base {
   body {
-    @apply bg-[#f5f5f5] text-[#1a1a1a] font-sans antialiased;
+    @apply bg-[#F9FAFB] text-[#111827] antialiased;
   }
 }
 
-.card {
-  @apply bg-white rounded-[24px] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-6;
+@layer components {
+  .card {
+    @apply bg-white border border-[#E5E7EB] rounded-2xl p-6 shadow-sm transition-all duration-200;
+  }
+  
+  .card:hover {
+    @apply border-[#D1D5DB] shadow-md;
+  }
+
+  .btn-primary {
+    @apply bg-[#111827] text-white px-6 py-2.5 rounded-full font-medium transition-all hover:bg-[#1F2937] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2;
+  }
+
+  .btn-secondary {
+    @apply bg-white border border-[#E5E7EB] text-[#111827] px-6 py-2.5 rounded-full font-medium transition-all hover:bg-[#F3F4F6] hover:border-[#D1D5DB] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2;
+  }
+
+  .input-field {
+    @apply w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#111827]/5 focus:border-[#111827] placeholder:text-[#9CA3AF];
+  }
+
+  .label-caps {
+    @apply text-[10px] uppercase tracking-[0.1em] font-bold text-[#6B7280];
+  }
 }
 
-.btn-primary {
-  @apply bg-[#1a1a1a] text-white px-6 py-3 rounded-full font-medium transition-all hover:bg-[#333] disabled:opacity-50 disabled:cursor-not-allowed;
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
 }
 
-.btn-secondary {
-  @apply bg-white border border-[#e5e5e5] text-[#1a1a1a] px-6 py-3 rounded-full font-medium transition-all hover:bg-[#f9f9f9] disabled:opacity-50;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.input-field {
-  @apply w-full bg-[#f9f9f9] border border-[#e5e5e5] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#1a1a1a]/10 transition-all;
+::-webkit-scrollbar-thumb {
+  @apply bg-[#E5E7EB] rounded-full hover:bg-[#D1D5DB];
 }
 
-.markdown-body {
-  @apply prose prose-slate max-w-none text-[#333];
+/* Markdown Styling */
+.prose {
+  @apply text-[#374151] leading-relaxed;
 }
 
-.markdown-body h1 { @apply text-3xl font-bold mb-6 text-[#1a1a1a]; }
-.markdown-body h2 { @apply text-xl font-bold mt-8 mb-4 text-[#1a1a1a] border-b border-[#eee] pb-2; }
-.markdown-body h3 { @apply text-lg font-bold mt-6 mb-2 text-[#1a1a1a]; }
-.markdown-body p { @apply mb-4 leading-relaxed; }
-.markdown-body ul { @apply list-disc pl-6 mb-6 space-y-2; }
-.markdown-body li { @apply mb-1; }
-.markdown-body strong { @apply font-bold text-[#000]; }
-
-/* Template Specific Overrides */
-.font-serif {
-  font-family: 'Georgia', 'Times New Roman', serif;
+.prose h1, .prose h2, .prose h3 {
+  @apply text-[#111827] font-semibold tracking-tight mt-6 mb-4;
 }
 
-/* Fix for html2canvas oklch parsing error */
-[ref="resumeRef"], .resume-container, .resume-container * {
-  --tw-prose-body: #404040;
-  --tw-prose-headings: #171717;
-  --tw-prose-lead: #525252;
-  --tw-prose-links: #171717;
-  --tw-prose-bold: #171717;
-  --tw-prose-counters: #737373;
-  --tw-prose-bullets: #d4d4d4;
-  --tw-prose-hr: #e5e5e5;
-  --tw-prose-quotes: #171717;
-  --tw-prose-quote-borders: #e5e5e5;
-  --tw-prose-captions: #737373;
-  --tw-prose-code: #171717;
-  --tw-prose-pre-code: #e5e5e5;
-  --tw-prose-pre-bg: #262626;
-  --tw-prose-th-borders: #d4d4d4;
-  --tw-prose-td-borders: #e5e5e5;
+.prose p {
+  @apply mb-4;
 }
 
-.prose-indigo h1, .prose-indigo h2 {
-  color: #4338ca;
+.prose ul {
+  @apply list-disc pl-5 mb-4 space-y-1;
 }
 
-.prose-amber h1, .prose-amber h2 {
-  color: #92400e;
+.prose strong {
+  @apply text-[#111827] font-semibold;
 }
 
-.prose-slate h1, .prose-slate h2 {
-  color: #334155;
-}
-
-.prose-neutral h1, .prose-neutral h2 {
-  color: #404040;
-}
-
-/* Force hex colors for all elements inside resume-container */
-.resume-container, .resume-container * {
-  color: #1a1a1a !important;
-  border-color: #e5e5e5 !important;
-}
-
+/* Resume Templates */
 .resume-container {
-  padding: 3rem !important;
-  line-height: 1.6;
-  color: #1a1a1a;
+  @apply bg-white shadow-2xl mx-auto overflow-hidden transition-all duration-500;
+  width: 210mm;
+  min-height: 297mm;
+  padding: 20mm;
 }
 
-.resume-container h1 {
-  @apply text-center mb-8;
+.template-modern {
+  @apply font-sans;
 }
 
-.resume-container h2 {
-  @apply border-b-2 border-[#1a1a1a] pb-1 mt-10 mb-5 uppercase tracking-wider font-bold;
+.template-classic {
+  @apply font-serif;
 }
 
-.resume-container h3 {
-  @apply font-bold mt-6 mb-2 text-lg;
+.template-technical {
+  @apply font-mono text-[13px];
 }
 
-.resume-container p {
-  @apply mb-3;
+.template-creative {
+  @apply font-sans;
 }
 
-.resume-container ul {
-  @apply list-disc pl-6 mb-4 space-y-1;
-}
-
-.resume-container li {
-  @apply leading-relaxed;
-}
-
-/* Markdown Element Styling within Resume */
-.resume-container strong {
-  @apply font-bold text-[#000];
-}
-
-.resume-container em {
-  @apply italic text-[#4a5568];
-}
-
-.resume-container hr {
-  @apply border-t border-[#e2e8f0] my-6;
-}
-
-.resume-container blockquote {
-  @apply border-l-4 border-[#e2e8f0] pl-4 italic text-[#718096] my-4;
-}
-
-/* Modern Template */
-.resume-container.font-sans {
-  @apply text-[#2d3748];
-}
-
-.resume-container.font-sans h1 {
-  @apply text-5xl font-extrabold tracking-tight text-left border-none mb-1 text-[#1a1a1a];
-}
-
-.resume-container.font-sans h2 {
-  @apply text-sm font-black text-[#718096] border-b border-[#e2e8f0] pb-2 mt-12 mb-6 uppercase tracking-[0.15em];
-}
-
-.resume-container.font-sans h3 {
-  @apply text-lg font-bold text-[#2d3748] mt-6 mb-1;
-}
-
-/* Classic Template */
-.resume-container.font-serif {
-  @apply text-[#000] max-w-[800px] mx-auto;
-}
-
-.resume-container.font-serif h1 {
-  @apply text-4xl font-serif font-bold mb-1 uppercase tracking-tight;
-}
-
-.resume-container.font-serif h2 {
-  @apply text-base border-b border-[#000] pb-0 mt-8 text-center font-bold uppercase tracking-[0.2em] mb-4;
-}
-
-.resume-container.font-serif h3 {
-  @apply text-sm font-bold mt-4 mb-1 flex justify-between items-baseline;
-}
-
-.resume-container.font-serif p {
-  @apply text-sm mb-2;
-}
-
-/* Technical Template */
-.resume-container.font-mono {
-  @apply text-[#1a202c] text-[11px] leading-tight;
-}
-
-.resume-container.font-mono h1 {
-  @apply text-2xl font-mono border-none text-left mb-2 font-bold;
-}
-
-.resume-container.font-mono h2 {
-  @apply text-[11px] font-black bg-[#edf2f7] border-none px-2 py-0.5 mt-5 mb-2 uppercase tracking-wider;
-}
-
-.resume-container.font-mono h3 {
-  @apply text-[11px] font-bold mt-3 mb-0.5 border-b border-[#edf2f7];
-}
-
-.resume-container.font-mono ul {
-  @apply list-none pl-0 mb-3 space-y-0.5;
-}
-
-.resume-container.font-mono li {
-  @apply before:content-['>'] before:mr-2 before:text-[#718096];
-}
-
-/* Creative Template */
-.resume-container.font-creative {
-  @apply text-[#1a1a1a] bg-gradient-to-br from-white to-indigo-50/20;
-}
-
-.resume-container.font-creative h1 {
-  @apply text-6xl font-black text-indigo-900 mb-2 tracking-tighter uppercase;
-}
-
-.resume-container.font-creative h2 {
-  @apply text-lg font-black text-white bg-indigo-600 px-4 py-1 mt-10 mb-5 inline-block skew-x-[-12deg];
-}
-
-.resume-container.font-creative h3 {
-  @apply text-xl font-bold text-indigo-800 mt-6 mb-1;
-}
-
-.resume-container.font-creative ul {
-  @apply border-l-2 border-indigo-100 pl-6;
-}
-
-.resume-container h1, .resume-container h2, .resume-container h3 {
-  color: #111111 !important;
-}
-
-.resume-container .prose-indigo h1, .resume-container .prose-indigo h2 {
-  color: #4338ca !important;
+.template-creative h1 {
+  @apply text-indigo-600;
 }
 
 .resume-container .prose-amber h1, .resume-container .prose-amber h2 {
@@ -253,6 +127,7 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;

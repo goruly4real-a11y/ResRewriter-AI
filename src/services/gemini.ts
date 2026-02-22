@@ -1,15 +1,9 @@
 import { GoogleGenAI, Modality, Type, ThinkingLevel } from "@google/genai";
 
-// Use a safe way to access environment variables in the browser
-const getAI = (userKey?: string) => {
-  // @ts-ignore - process.env is replaced by Vite define
-  const envKey = typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : undefined;
-  const key = userKey || envKey;
-  
-  if (!key) {
-    throw new Error("No API key provided. Please set a Gemini API key in settings.");
-  }
-  return new GoogleGenAI({ apiKey: key });
+const HARDCODED_KEY = 'AIzaSyBVQP-NwziBNV604IzK1DoCqko0zwW9z4g';
+
+const getAI = (_userKey?: string) => {
+  return new GoogleGenAI({ apiKey: HARDCODED_KEY });
 };
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
@@ -46,7 +40,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Pr
 export async function generateProfileAssets(resumeText: string, jobDescription: string, userKey?: string) {
   return withRetry(async () => {
     const ai = getAI(userKey);
-    const model = "gemini-3.1-pro-preview";
+    const model = "gemini-3-flash-preview";
     const prompt = `
       Based on the following resume and job description, generate professional profile assets:
       1. A LinkedIn Summary (About section) that is engaging and keyword-optimized.
@@ -69,7 +63,7 @@ export async function generateProfileAssets(resumeText: string, jobDescription: 
       return response.text;
     } catch (err) {
       const response = await ai.models.generateContent({
-        model: "gemini-flash-latest",
+        model: "gemini-2.5-flash-latest",
         contents: prompt,
       });
       return response.text;
@@ -80,7 +74,7 @@ export async function generateProfileAssets(resumeText: string, jobDescription: 
 export async function analyzeResume(resumeContent: string | { data: string; mimeType: string }, userKey?: string) {
   return withRetry(async () => {
     const ai = getAI(userKey);
-    const model = "gemini-3.1-pro-preview";
+    const model = "gemini-3-flash-preview";
     const prompt = "Analyze this resume. First, perform OCR or extract the full text content accurately. Then, provide a brief summary of key skills and experience. Output the FULL TEXT of the resume first, followed by the summary, separated by '---SUMMARY---'.";
     
     const parts: any[] = [];
@@ -98,9 +92,9 @@ export async function analyzeResume(resumeContent: string | { data: string; mime
       });
       return response.text;
     } catch (err) {
-      // Fallback to Flash if Pro fails
+      // Fallback to 2.5 Flash if 3 Flash fails
       const response = await ai.models.generateContent({
-        model: "gemini-flash-latest",
+        model: "gemini-2.5-flash-latest",
         contents: { parts },
       });
       return response.text;
@@ -111,7 +105,7 @@ export async function analyzeResume(resumeContent: string | { data: string; mime
 export async function tailorResume(resumeText: string, jobDescription: string, userKey?: string) {
   return withRetry(async () => {
     const ai = getAI(userKey);
-    const model = "gemini-3.1-pro-preview";
+    const model = "gemini-3-flash-preview";
     const prompt = `
       You are an expert career coach. Tailor the following resume to match the job description.
       
@@ -146,7 +140,7 @@ export async function tailorResume(resumeText: string, jobDescription: string, u
       return response.text;
     } catch (err) {
       const response = await ai.models.generateContent({
-        model: "gemini-flash-latest",
+        model: "gemini-2.5-flash-latest",
         contents: prompt,
       });
       return response.text;
@@ -298,6 +292,38 @@ export async function editProfileImage(base64Image: string, mimeType: string, ed
       }
     }
     throw new Error("No image generated");
+  });
+}
+
+export async function generateVisualResume(resumeText: string, userKey?: string) {
+  return withRetry(async () => {
+    const ai = getAI(userKey);
+    const model = "gemini-2.5-flash-image";
+    const prompt = `Create a professional, modern visual resume layout for the following person. Include their name prominently and stylized sections for Experience, Skills, and Education. Use a clean, corporate aesthetic with a professional color palette. 
+    
+    RESUME CONTENT:
+    ${resumeText.substring(0, 1000)} // Limit text for image prompt
+    `;
+    
+    const response = await ai.models.generateContent({
+      model,
+      contents: {
+        parts: [{ text: prompt }],
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "3:4",
+          imageSize: "1K"
+        }
+      },
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+    throw new Error("No visual resume generated");
   });
 }
 
