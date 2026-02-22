@@ -80,7 +80,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'tailor' | 'research' | 'creative'>('tailor');
   const [showSettings, setShowSettings] = useState(false);
-  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
+  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('gemini_api_key') || 'AIzaSyBVQP-NwziBNV604IzK1DoCqko0zwW9z4g');
 
   const clearAllData = () => {
     if (confirm('Are you sure you want to clear all resume data and results?')) {
@@ -341,23 +341,57 @@ export default function App() {
 
   const exportPDF = async () => {
     if (!resumeRef.current) return;
-    const canvas = await html2canvas(resumeRef.current);
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save('tailored-resume.pdf');
+    try {
+      const canvas = await html2canvas(resumeRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save('tailored-resume.pdf');
+    } catch (err) {
+      console.error('PDF Export Error:', err);
+      setError('Failed to export PDF. Please try again.');
+    }
   };
 
   const exportImage = async () => {
     if (!resumeRef.current) return;
-    const canvas = await html2canvas(resumeRef.current);
-    const link = document.createElement('a');
-    link.download = 'tailored-resume.png';
-    link.href = canvas.toDataURL();
-    link.click();
+    try {
+      const canvas = await html2canvas(resumeRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      const link = document.createElement('a');
+      link.download = 'tailored-resume.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      console.error('Image Export Error:', err);
+      setError('Failed to export image. Please try again.');
+    }
+  };
+
+  const exportText = () => {
+    if (!tailoredResume) return;
+    const blob = new Blob([tailoredResume], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tailored-resume.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
@@ -559,42 +593,16 @@ export default function App() {
 
               {tailoredResume && (
                 <div className="space-y-8">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-semibold">Tailored Results</h2>
-                    <div className="flex gap-2">
-                      <button onClick={exportPDF} className="btn-primary py-2 px-6 text-sm flex items-center gap-2">
-                        <Download className="w-4 h-4" /> Export PDF
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid lg:grid-cols-12 gap-8">
-                    <div className="lg:col-span-4 space-y-8">
+                  <div className="grid md:grid-cols-3 gap-8">
+                    <div className="md:col-span-1 space-y-8">
                       {skillsGap && (
                         <div className="card space-y-4 bg-amber-50/30 border-amber-100">
                           <h3 className="font-semibold text-sm uppercase tracking-wider text-amber-800 flex items-center gap-2">
                             <AlertCircle className="w-4 h-4" /> Skills Gap Analysis
                           </h3>
-                          <div className="text-sm prose prose-sm prose-amber max-w-none">
+                          <div className="text-sm prose prose-sm prose-amber">
                             <Markdown>{skillsGap}</Markdown>
                           </div>
-                        </div>
-                      )}
-                      
-                      {coverLetter && (
-                        <div className="card space-y-4 bg-emerald-50/30 border-emerald-100">
-                          <h3 className="font-semibold text-sm uppercase tracking-wider text-emerald-800 flex items-center gap-2">
-                            <FileText className="w-4 h-4" /> Cover Letter Preview
-                          </h3>
-                          <div className="text-sm prose prose-sm prose-emerald max-w-none line-clamp-[15]">
-                            <Markdown>{coverLetter}</Markdown>
-                          </div>
-                          <button 
-                            onClick={() => setActiveTab('tailor')} // Stay on tab but scroll or just show it's there
-                            className="text-xs font-medium text-emerald-700 hover:underline"
-                          >
-                            Scroll to full letter below ↓
-                          </button>
                         </div>
                       )}
 
@@ -604,13 +612,10 @@ export default function App() {
                       </div>
                     </div>
                     
-                    <div className="lg:col-span-8 space-y-8">
+                    <div className="md:col-span-2 space-y-8">
                       <div className="card space-y-6">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                          <div className="space-y-1">
-                            <h3 className="text-lg font-semibold">Tailored Resume</h3>
-                            <p className="text-xs text-[#666]">Optimized for the provided job description</p>
-                          </div>
+                          <h2 className="text-xl font-semibold">Tailored Resume</h2>
                           <div className="flex flex-wrap gap-2">
                             <button 
                               onClick={onOptimizeATS}
@@ -620,6 +625,49 @@ export default function App() {
                               {loading.ats ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                               ATS Optimize
                             </button>
+                            <div className="flex items-center bg-[#f5f5f5] rounded-full p-1 border border-[#e5e5e5]">
+                              <div className="px-3 py-1.5 text-[#999]">
+                                <Download className="w-3.5 h-3.5" />
+                              </div>
+                              <button 
+                                onClick={exportPDF} 
+                                className="px-3 py-1.5 text-xs font-medium hover:bg-white hover:shadow-sm rounded-full transition-all flex items-center gap-1.5"
+                                title="Download PDF"
+                              >
+                                <FileText className="w-3.5 h-3.5" /> PDF
+                              </button>
+                              <button 
+                                onClick={exportImage} 
+                                className="px-3 py-1.5 text-xs font-medium hover:bg-white hover:shadow-sm rounded-full transition-all flex items-center gap-1.5"
+                                title="Download Image"
+                              >
+                                <ImageIcon className="w-3.5 h-3.5" /> PNG
+                              </button>
+                              <button 
+                                onClick={exportText} 
+                                className="px-3 py-1.5 text-xs font-medium hover:bg-white hover:shadow-sm rounded-full transition-all flex items-center gap-1.5"
+                                title="Download Text"
+                              >
+                                <Layout className="w-3.5 h-3.5" /> TXT
+                              </button>
+                              <button 
+                                onClick={handlePrint} 
+                                className="px-3 py-1.5 text-xs font-medium hover:bg-white hover:shadow-sm rounded-full transition-all flex items-center gap-1.5"
+                                title="Print Resume"
+                              >
+                                <Briefcase className="w-3.5 h-3.5" /> Print
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(tailoredResume);
+                                  alert('Resume copied to clipboard!');
+                                }} 
+                                className="px-3 py-1.5 text-xs font-medium hover:bg-white hover:shadow-sm rounded-full transition-all flex items-center gap-1.5"
+                                title="Copy to Clipboard"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Copy
+                              </button>
+                            </div>
                           </div>
                         </div>
 
@@ -648,17 +696,13 @@ export default function App() {
 
                         <div 
                           ref={resumeRef}
-                          className={`p-12 bg-white border border-[#e5e5e5] rounded-lg shadow-sm min-h-[800px] transition-all duration-500 ${
+                          className={`resume-container p-12 bg-white border border-[#e5e5e5] rounded-lg shadow-sm min-h-[800px] transition-all duration-500 ${
                             selectedTemplate === 'classic' ? 'font-serif' : 
-                            selectedTemplate === 'technical' ? 'font-mono text-sm' : 'font-sans'
+                            selectedTemplate === 'technical' ? 'font-mono text-sm' : 
+                            selectedTemplate === 'creative' ? 'font-creative' : 'font-sans'
                           }`}
                         >
-                          <div className={`markdown-body ${
-                            selectedTemplate === 'creative' ? 'prose-indigo' : 
-                            selectedTemplate === 'technical' ? 'prose-slate' : 'prose-neutral'
-                          }`}>
-                            <Markdown>{tailoredResume}</Markdown>
-                          </div>
+                          <Markdown>{tailoredResume}</Markdown>
                         </div>
                       </div>
 
@@ -670,19 +714,36 @@ export default function App() {
                         >
                           <div className="flex items-center justify-between">
                             <h2 className="text-xl font-semibold">Cover Letter</h2>
-                            <button 
-                              onClick={() => {
-                                const blob = new Blob([coverLetter], { type: 'text/markdown' });
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = 'cover-letter.md';
-                                a.click();
-                              }}
-                              className="btn-secondary py-2 px-4 text-sm flex items-center gap-2"
-                            >
-                              <Download className="w-4 h-4" /> Markdown
-                            </button>
+                            <div className="flex items-center bg-[#f5f5f5] rounded-full p-1 border border-[#e5e5e5]">
+                              <div className="px-3 py-1.5 text-[#999]">
+                                <Download className="w-3.5 h-3.5" />
+                              </div>
+                              <button 
+                                onClick={() => {
+                                  const blob = new Blob([coverLetter], { type: 'text/plain' });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = 'cover-letter.txt';
+                                  a.click();
+                                  URL.revokeObjectURL(url);
+                                }} 
+                                className="px-3 py-1.5 text-xs font-medium hover:bg-white hover:shadow-sm rounded-full transition-all flex items-center gap-1.5"
+                                title="Download Text"
+                              >
+                                TXT
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(coverLetter);
+                                  alert('Cover letter copied to clipboard!');
+                                }} 
+                                className="px-3 py-1.5 text-xs font-medium hover:bg-white hover:shadow-sm rounded-full transition-all flex items-center gap-1.5"
+                                title="Copy to Clipboard"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Copy
+                              </button>
+                            </div>
                           </div>
                           <div className="p-12 bg-white border border-[#e5e5e5] rounded-lg shadow-sm markdown-body">
                             <Markdown>{coverLetter}</Markdown>
@@ -698,19 +759,36 @@ export default function App() {
                         >
                           <div className="flex items-center justify-between">
                             <h2 className="text-xl font-semibold">LinkedIn & Profile Assets</h2>
-                            <button 
-                              onClick={() => {
-                                const blob = new Blob([profileAssets], { type: 'text/markdown' });
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = 'profile-assets.md';
-                                a.click();
-                              }}
-                              className="btn-secondary py-2 px-4 text-sm flex items-center gap-2"
-                            >
-                              <Download className="w-4 h-4" /> Markdown
-                            </button>
+                            <div className="flex items-center bg-[#f5f5f5] rounded-full p-1 border border-[#e5e5e5]">
+                              <div className="px-3 py-1.5 text-[#999]">
+                                <Download className="w-3.5 h-3.5" />
+                              </div>
+                              <button 
+                                onClick={() => {
+                                  const blob = new Blob([profileAssets], { type: 'text/plain' });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = 'profile-assets.txt';
+                                  a.click();
+                                  URL.revokeObjectURL(url);
+                                }} 
+                                className="px-3 py-1.5 text-xs font-medium hover:bg-white hover:shadow-sm rounded-full transition-all flex items-center gap-1.5"
+                                title="Download Text"
+                              >
+                                TXT
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(profileAssets);
+                                  alert('Profile assets copied to clipboard!');
+                                }} 
+                                className="px-3 py-1.5 text-xs font-medium hover:bg-white hover:shadow-sm rounded-full transition-all flex items-center gap-1.5"
+                                title="Copy to Clipboard"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Copy
+                              </button>
+                            </div>
                           </div>
                           <div className="p-12 bg-white border border-[#e5e5e5] rounded-lg shadow-sm markdown-body">
                             <Markdown>{profileAssets}</Markdown>

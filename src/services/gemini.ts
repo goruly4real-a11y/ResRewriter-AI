@@ -50,10 +50,10 @@ export async function generateProfileAssets(resumeText: string, jobDescription: 
       2. Three "Cover Letter Snippets" - short, impactful paragraphs that can be used in emails or as part of a longer letter, each focusing on a different strength (e.g., Technical Skills, Leadership, Problem Solving).
       
       Output in Markdown format with clear headings.
-
+      
       RESUME:
       ${resumeText}
-
+      
       JOB DESCRIPTION:
       ${jobDescription}
     `;
@@ -66,7 +66,7 @@ export async function generateProfileAssets(resumeText: string, jobDescription: 
       return response.text;
     } catch (err) {
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-flash-latest",
         contents: prompt,
       });
       return response.text;
@@ -97,7 +97,7 @@ export async function analyzeResume(resumeContent: string | { data: string; mime
     } catch (err) {
       // Fallback to Flash if Pro fails
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-flash-latest",
         contents: { parts },
       });
       return response.text;
@@ -111,9 +111,22 @@ export async function tailorResume(resumeText: string, jobDescription: string, u
     const model = "gemini-3.1-pro-preview";
     const prompt = `
       You are an expert career coach. Tailor the following resume to match the job description.
-      Focus on highlighting relevant skills and experiences. 
-      Maintain a professional tone.
-      Output the tailored resume in Markdown format.
+      
+      STRUCTURE GUIDELINES:
+      - Use a clear hierarchy with Markdown headings.
+      - # Full Name (at the top)
+      - ## Contact Information (Email, Phone, LinkedIn, Location)
+      - ## Professional Summary (3-4 impactful sentences)
+      - ## Core Competencies (A bulleted list of key skills)
+      - ## Professional Experience (Reverse chronological order)
+        - ### Job Title | Company Name | Dates
+        - Use bullet points for achievements, starting with strong action verbs.
+      - ## Education
+      
+      TAILORING INSTRUCTIONS:
+      - Highlight skills and experiences that directly map to the job description.
+      - Quantify achievements where possible (e.g., "Increased sales by 20%").
+      - Maintain a professional, modern tone.
 
       RESUME:
       ${resumeText}
@@ -130,7 +143,7 @@ export async function tailorResume(resumeText: string, jobDescription: string, u
       return response.text;
     } catch (err) {
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-flash-latest",
         contents: prompt,
       });
       return response.text;
@@ -141,7 +154,7 @@ export async function tailorResume(resumeText: string, jobDescription: string, u
 export async function researchCompany(companyName: string, userKey?: string) {
   return withRetry(async () => {
     const ai = getAI(userKey);
-    const model = "gemini-3-flash-preview";
+    const model = "gemini-flash-latest";
     const prompt = `Research the company "${companyName}". Provide a brief overview of their mission, recent news, and culture to help tailor a resume.`;
 
     const response = await ai.models.generateContent({
@@ -162,7 +175,7 @@ export async function researchCompany(companyName: string, userKey?: string) {
 export async function getQuickFeedback(text: string, userKey?: string) {
   return withRetry(async () => {
     const ai = getAI(userKey);
-    const model = "gemini-2.5-flash-lite-latest";
+    const model = "gemini-flash-lite-latest";
     const prompt = `Provide a very brief, 2-sentence critique of this text for professional impact: "${text}"`;
 
     const response = await ai.models.generateContent({
@@ -226,7 +239,7 @@ export async function analyzeSkillsGap(resumeText: string, jobDescription: strin
       return response.text;
     } catch (err) {
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-flash-latest",
         contents: prompt,
       });
       return response.text;
@@ -310,7 +323,7 @@ export async function generateCoverLetter(resumeText: string, jobDescription: st
       return response.text;
     } catch (err) {
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-flash-latest",
         contents: prompt,
       });
       return response.text;
@@ -345,7 +358,7 @@ export async function optimizeForATS(tailoredResume: string, jobDescription: str
       return response.text;
     } catch (err) {
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-flash-latest",
         contents: prompt,
       });
       return response.text;
